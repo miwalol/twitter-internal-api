@@ -111,26 +111,14 @@ type GraphQLRequest struct {
 	Features  map[string]bool        `json:"features"`
 }
 
-// ExecuteGraphQL executes a GraphQL query with variables, queryID, operation name, and features
-func (c *Client) ExecuteGraphQL(
-	variables map[string]interface{},
-	queryID string,
-	operationName string,
-	features map[string]bool,
-) (map[string]interface{}, error) {
-	// Construct the GraphQL request
-	payload := GraphQLRequest{
-		Variables: variables,
-		QueryID:   queryID,
-		Features:  features,
-	}
+// executeGraphQLRequest performs the HTTP request for a GraphQL call and handles the response.
+// It is used by ExecuteGraphQL and for retries on CSRF expiry (error code 353).
+// retry controls whether a single retry is attempted on error code 353.
+func (c *Client) executeGraphQLRequest(body []byte, queryID, operationName string) (map[string]interface{}, error) {
+	return c.doGraphQLRequest(body, queryID, operationName, true)
+}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	// Build URL - format: https://x.com/i/api/graphql/{queryId}/{operationName}
+func (c *Client) doGraphQLRequest(body []byte, queryID, operationName string, retry bool) (map[string]interface{}, error) {
 	finalURL := fmt.Sprintf("%s/%s/%s", graphqlBaseURL, queryID, operationName)
 
 	req, err := http.NewRequest("POST", finalURL, bytes.NewReader(body))
@@ -138,7 +126,6 @@ func (c *Client) ExecuteGraphQL(
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
@@ -165,17 +152,11 @@ func (c *Client) ExecuteGraphQL(
 	csrfToken := c.GetCSRFToken()
 	if csrfToken != "" {
 		req.Header.Set("X-CSRF-Token", csrfToken)
-		req.AddCookie(&http.Cookie{
-			Name:  "ct0",
-			Value: csrfToken,
-		})
+		req.AddCookie(&http.Cookie{Name: "ct0", Value: csrfToken})
 	}
 
 	if c.authToken != "" {
-		req.AddCookie(&http.Cookie{
-			Name:  "auth_token",
-			Value: c.authToken,
-		})
+		req.AddCookie(&http.Cookie{Name: "auth_token", Value: c.authToken})
 	}
 
 	if c.cookies != "" {
@@ -196,7 +177,6 @@ func (c *Client) ExecuteGraphQL(
 	}
 	defer resp.Body.Close()
 
-	// Handle ct0 cookie updates from response headers
 	for _, setCookie := range resp.Header["Set-Cookie"] {
 		if ct0 := extractCT0FromCookie(setCookie); ct0 != "" {
 			c.setCSRFTokenLocked(ct0)
@@ -214,15 +194,17 @@ func (c *Client) ExecuteGraphQL(
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	if resp.StatusCode >= 400 {
-		if message, ok := result["message"].(string); ok {
-			return nil, errors.New(message)
-		}
-
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
-	}
-
 	if errs, ok := result["errors"].([]interface{}); ok && len(errs) > 0 {
+		if retry {
+			for _, e := range errs {
+				if errMap, ok := e.(map[string]interface{}); ok {
+					if code, ok := errMap["code"].(float64); ok && int(code) == 353 {
+						// CSRF token expired — ct0 may have been refreshed via Set-Cookie above; retry once
+						return c.doGraphQLRequest(body, queryID, operationName, false)
+					}
+				}
+			}
+		}
 		errMessages := make([]string, len(errs))
 		for i, e := range errs {
 			if errMap, ok := e.(map[string]interface{}); ok {
@@ -234,5 +216,33 @@ func (c *Client) ExecuteGraphQL(
 		return nil, fmt.Errorf("GraphQL error: %s", strings.Join(errMessages, ", "))
 	}
 
+	if resp.StatusCode >= 400 {
+		if message, ok := result["message"].(string); ok {
+			return nil, errors.New(message)
+		}
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+
 	return result, nil
+}
+
+// ExecuteGraphQL executes a GraphQL query with variables, queryID, operation name, and features
+func (c *Client) ExecuteGraphQL(
+	variables map[string]interface{},
+	queryID string,
+	operationName string,
+	features map[string]bool,
+) (map[string]interface{}, error) {
+	payload := GraphQLRequest{
+		Variables: variables,
+		QueryID:   queryID,
+		Features:  features,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	return c.executeGraphQLRequest(body, queryID, operationName)
 }
