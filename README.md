@@ -2,8 +2,9 @@
 
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/miwalol/twitter-internal-api)
 [![Go Reference](https://pkg.go.dev/badge/github.com/miwalol/twitter-internal-api.svg)](https://pkg.go.dev/github.com/miwalol/twitter-internal-api)
+[![Go Report Card](https://goreportcard.com/badge/github.com/miwalol/twitter-internal-api)](https://goreportcard.com/report/github.com/miwalol/twitter-internal-api)
 
-A lightweight Go client for the internal Twitter API. Post and schedule tweets programmatically with just an auth token.
+A lightweight Go client to interact with the internal Twitter API used on the web version, with just your `auth_token` and `ct0` cookies.
 
 Originally built for [Miwa.lol](https://miwa.lol/), this package is open for anyone to use and contribute to.
 
