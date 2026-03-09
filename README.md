@@ -1,11 +1,11 @@
-# Twitter Internal API Go Package
+# Twitter Internal API
 
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/miwalol/twitter-internal-api)
 [![Go Reference](https://pkg.go.dev/badge/github.com/miwalol/twitter-internal-api.svg)](https://pkg.go.dev/github.com/miwalol/twitter-internal-api)
 
-A minimal Go package for posting and scheduling tweets using the internal Twitter API with an authentication token.
+A lightweight Go client for the internal Twitter API. Post and schedule tweets programmatically with just an auth token.
 
-This package is public so that anyone can use it and contribute, but keep in mind that we made it for our usage.
+Originally built for [Miwa.lol](https://miwa.lol/), this package is open for anyone to use and contribute to.
 
 ## Installation
 
@@ -13,7 +13,7 @@ This package is public so that anyone can use it and contribute, but keep in min
 go get github.com/miwalol/twitter-internal-api
 ```
 
-## Usage
+## Quick Start
 
 ```go
 package main
@@ -24,14 +24,17 @@ import (
 )
 
 func main() {
-	// Create a new client with your auth token
-	client := twitterinternalapi.NewClient("your-auth-token-here")
+	client := twitterinternalapi.NewClient("your-auth-token")
 	
-	// Post a tweet
 	tweet, err := client.Tweets.Create("Hello from Go!", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Tweet posted with ID:", tweet.ID)
+	
+	log.Println("Tweet ID:", tweet.ID)
 }
 ```
+
+## License
+
+MIT License - see [LICENSE](LICENSE)
