@@ -76,12 +76,18 @@ tweet, err := client.Tweets.Create("Sensitive content", opts)
 ### Uploading Media
 
 ```go
-// Upload an image
+// Upload from a file path
 mediaID, err := client.UploadMedia("path/to/image.png", "image/png")
 if err != nil {
 	log.Fatal(err)
 }
-log.Println("Media uploaded:", mediaID)
+
+// Upload from a byte slice
+data, _ := os.ReadFile("path/to/image.png")
+mediaID, err := client.UploadMediaBytes(data, "image/png")
+if err != nil {
+	log.Fatal(err)
+}
 
 // Create tweet with uploaded media
 opts := &twitterinternalapi.CreateTweetOptions{

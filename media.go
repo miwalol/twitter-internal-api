@@ -28,35 +28,36 @@ type MediaUploadResponse struct {
 // ImageInfo contains image metadata
 type ImageInfo struct {
 	ImageType string `json:"image_type"`
-	W         int    `json:"w"`
-	H         int    `json:"h"`
+	Width     int    `json:"w"`
+	Height    int    `json:"h"`
 }
 
-// UploadMedia uploads a media file and returns the media ID
+// UploadMedia uploads a media file from a file path and returns the media ID
 func (c *Client) UploadMedia(filePath string, mediaType string) (string, error) {
-	// Read file
 	fileData, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
+	return c.UploadMediaBytes(fileData, mediaType)
+}
 
-	fileSize := len(fileData)
-
+// UploadMediaBytes uploads media from a byte slice and returns the media ID
+func (c *Client) UploadMediaBytes(data []byte, mediaType string) (string, error) {
 	// Step 1: INIT
-	mediaID, err := c.uploadInit(int64(fileSize), mediaType)
+	mediaID, err := c.uploadInit(int64(len(data)), mediaType)
 	if err != nil {
 		return "", fmt.Errorf("failed to init upload: %w", err)
 	}
 
 	// Step 2: APPEND
-	if err := c.uploadAppend(mediaID, fileData); err != nil {
+	if err = c.uploadAppend(mediaID, data); err != nil {
 		return "", fmt.Errorf("failed to append media: %w", err)
 	}
 
 	// Step 3: FINALIZE
-	hash := md5.Sum(fileData)
+	hash := md5.Sum(data)
 	md5Hash := fmt.Sprintf("%x", hash)
-	if err := c.uploadFinalize(mediaID, md5Hash); err != nil {
+	if err = c.uploadFinalize(mediaID, md5Hash); err != nil {
 		return "", fmt.Errorf("failed to finalize upload: %w", err)
 	}
 
@@ -105,7 +106,7 @@ func (c *Client) uploadInit(totalBytes int64, mediaType string) (int64, error) {
 	}
 
 	var result MediaUploadResponse
-	if err := json.Unmarshal(body, &result); err != nil {
+	if err = json.Unmarshal(body, &result); err != nil {
 		return 0, fmt.Errorf("failed to parse init response: %w", err)
 	}
 
@@ -129,7 +130,7 @@ func (c *Client) uploadAppend(mediaID int64, fileData []byte) error {
 	if err != nil {
 		return err
 	}
-	if _, err := part.Write(fileData); err != nil {
+	if _, err = part.Write(fileData); err != nil {
 		return err
 	}
 	writer.Close()
@@ -214,7 +215,7 @@ func (c *Client) uploadFinalize(mediaID int64, md5Hash string) error {
 	}
 
 	var result MediaUploadResponse
-	if err := json.Unmarshal(body, &result); err != nil {
+	if err = json.Unmarshal(body, &result); err != nil {
 		return fmt.Errorf("failed to parse finalize response: %w", err)
 	}
 
