@@ -4,19 +4,23 @@ import "time"
 
 // Tweet represents a Twitter tweet.
 type Tweet struct {
-	ID          string      `json:"id"`
-	Text        string      `json:"text"`
-	CreatedAt   string      `json:"created_at"`
-	Stats       *TweetStats `json:"stats"`
-	ScheduledAt *string     `json:"scheduled_at,omitempty"`
+	ID     string       `json:"rest_id"`
+	Legacy *TweetLegacy `json:"legacy"`
 }
 
-// TweetStats contains tweet statistics.
-type TweetStats struct {
-	Retweets  int `json:"retweets"`
-	Likes     int `json:"likes"`
-	Replies   int `json:"replies"`
-	Bookmarks int `json:"bookmarks"`
+// TweetLegacy contains the legacy tweet data
+type TweetLegacy struct {
+	FullText      string         `json:"full_text"`
+	CreatedAt     string         `json:"created_at"`
+	PublicMetrics *PublicMetrics `json:"public_metrics"`
+}
+
+// PublicMetrics contains tweet metrics
+type PublicMetrics struct {
+	RetweetCount  int `json:"retweet_count"`
+	ReplyCount    int `json:"reply_count"`
+	LikeCount     int `json:"like_count"`
+	BookmarkCount int `json:"bookmark_count"`
 }
 
 // CreateTweetOptions contains options for creating a tweet.

@@ -2,60 +2,29 @@ package twitterinternalapi
 
 import (
 	"log"
-	"time"
+	"testing"
 )
 
-func ExampleClient_PostTweet() {
-	client := NewClient("your-auth-token-here")
+// Example: Post a simple tweet
+func TestPostTweet(t *testing.T) {
+	client := NewClient("auth_token cookie", "ct0 cookie")
 
 	// Post a simple tweet
-	tweet, err := client.Tweets.Create("Hello from Go!", nil)
+	tweet, err := client.Tweets.Create("test", nil)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if tweet == nil {
+		log.Fatal("tweet is nil")
 	}
 	log.Println("Posted tweet with ID:", tweet.ID)
-}
-
-func ExampleClient_ScheduleTweet() {
-	client := NewClient("your-auth-token-here")
-
-	// Schedule a tweet for tomorrow at 10 AM
-	tomorrow := time.Now().AddDate(0, 0, 1)
-	scheduledTime := tomorrow.Format("2006-01-02T15:04:05Z")
-
-	scheduled, err := client.Tweets.Schedule("Good morning everyone!", scheduledTime)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Tweet scheduled for:", scheduled.ScheduledAt)
-}
-
-func ExampleClient_GetScheduledTweets() {
-	client := NewClient("your-auth-token-here")
-
-	// Get all scheduled tweets
-	tweets, err := client.Tweets.GetScheduled()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, tweet := range tweets {
-		log.Printf("Tweet: %s\nScheduled at: %v\n", tweet.Text, tweet.ScheduledAt)
+	if tweet.Legacy != nil {
+		log.Println("Tweet text:", tweet.Legacy.FullText)
+		log.Println("Created at:", tweet.Legacy.CreatedAt)
 	}
 }
 
-func ExampleClient_PostTweetWithOptions() {
-	client := NewClient("your-auth-token-here")
-
-	// Post a tweet with options
-	opts := &CreateTweetOptions{
-		MediaIDs:  []string{"media-id-1"},
-		Sensitive: true,
-	}
-
-	tweet, err := client.Tweets.Create("Check out this image!", opts)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Posted tweet with ID:", tweet.ID)
-}
+// TODO: Update these tests to use new ExecuteGraphQL API
+// func TestScheduleTweet(t *testing.T) { ... }
+// func TestGetScheduledTweets(t *testing.T) { ... }
+// func TestPostTweetWithOptions(t *testing.T) { ... }

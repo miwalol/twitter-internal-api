@@ -20,62 +20,63 @@ func (s *TweetsService) Create(text string, opts *CreateTweetOptions) (*Tweet, e
 		opts = &CreateTweetOptions{}
 	}
 
+	// Build media entities
+	mediaEntities := []interface{}{}
+	possiblySensitive := false
+	if opts.Sensitive {
+		possiblySensitive = true
+	}
+
 	variables := map[string]interface{}{
 		"tweet_text": text,
+		"media": map[string]interface{}{
+			"media_entities":     mediaEntities,
+			"possibly_sensitive": possiblySensitive,
+		},
+		"semantic_annotation_ids":  []interface{}{},
+		"disallowed_reply_options": nil,
 	}
 
-	if len(opts.MediaIDs) > 0 {
-		variables["media_ids"] = opts.MediaIDs
-	}
-	if opts.ReplyTo != nil {
-		variables["reply_to_id"] = *opts.ReplyTo
-	}
-	if opts.Sensitive {
-		variables["possibly_sensitive"] = true
+	// Features from Twitter's actual API
+	features := map[string]bool{
+		"premium_content_api_read_enabled":                                        false,
+		"communities_web_enable_tweet_community_results_fetch":                    true,
+		"c9s_tweet_anatomy_moderator_badge_enabled":                               true,
+		"responsive_web_grok_analyze_button_fetch_trends_enabled":                 false,
+		"responsive_web_grok_analyze_post_followups_enabled":                      true,
+		"responsive_web_jetfuel_frame":                                            true,
+		"responsive_web_grok_share_attachment_enabled":                            true,
+		"responsive_web_grok_annotations_enabled":                                 true,
+		"responsive_web_edit_tweet_api_enabled":                                   true,
+		"graphql_is_translatable_rweb_tweet_is_translatable_enabled":              true,
+		"view_counts_everywhere_api_enabled":                                      true,
+		"longform_notetweets_consumption_enabled":                                 true,
+		"responsive_web_twitter_article_tweet_consumption_enabled":                true,
+		"tweet_awards_web_tipping_enabled":                                        false,
+		"content_disclosure_indicator_enabled":                                    true,
+		"content_disclosure_ai_generated_indicator_enabled":                       true,
+		"responsive_web_grok_show_grok_translated_post":                           false,
+		"responsive_web_grok_analysis_button_from_backend":                        true,
+		"post_ctas_fetch_enabled":                                                 true,
+		"longform_notetweets_rich_text_read_enabled":                              true,
+		"longform_notetweets_inline_media_enabled":                                false,
+		"profile_label_improvements_pcf_label_in_post_enabled":                    true,
+		"responsive_web_profile_redirect_enabled":                                 false,
+		"rweb_tipjar_consumption_enabled":                                         false,
+		"verified_phone_label_enabled":                                            false,
+		"articles_preview_enabled":                                                true,
+		"responsive_web_grok_community_note_auto_translation_is_enabled":          false,
+		"responsive_web_graphql_skip_user_profile_image_extensions_enabled":       false,
+		"freedom_of_speech_not_reach_fetch_enabled":                               true,
+		"standardized_nudges_misinfo":                                             true,
+		"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": true,
+		"responsive_web_grok_image_annotation_enabled":                            true,
+		"responsive_web_grok_imagine_annotation_enabled":                          true,
+		"responsive_web_graphql_timeline_navigation_enabled":                      true,
+		"responsive_web_enhance_cards_enabled":                                    false,
 	}
 
-	query := `mutation CreateTweet($tweet_text: String!, $media_ids: [String!], $reply_to_id: String, $possibly_sensitive: Boolean) {
-		create_tweet(input: {
-			tweet_text: $tweet_text
-			media_ids: $media_ids
-			reply_to_id: $reply_to_id
-			possibly_sensitive: $possibly_sensitive
-		}) {
-			data {
-				create_tweet_response {
-					tweet_results {
-						result {
-							__typename
-							rest_id
-							core {
-								user_results {
-									result {
-										id
-										legacy {
-											name
-											screen_name
-										}
-									}
-								}
-							}
-							legacy {
-								full_text
-								created_at
-								public_metrics {
-									retweet_count
-									reply_count
-									like_count
-									bookmark_count
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}`
-
-	result, err := s.client.executeGraphQL(query, variables)
+	result, err := s.client.ExecuteGraphQL(variables, "sb6vH7FMb090KdK6IZaakw", "CreateTweet", features)
 	if err != nil {
 		return nil, err
 	}
@@ -83,12 +84,27 @@ func (s *TweetsService) Create(text string, opts *CreateTweetOptions) (*Tweet, e
 	// Extract tweet from response
 	data, ok := result["data"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("invalid response structure")
+		return nil, fmt.Errorf("invalid response structure: missing data field")
 	}
 
-	respBytes, err := json.Marshal(data)
+	createTweet, ok := data["create_tweet"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid response structure: missing create_tweet")
+	}
+
+	tweetResults, ok := createTweet["tweet_results"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid response structure: missing tweet_results")
+	}
+
+	resultData, ok := tweetResults["result"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid response structure: missing result")
+	}
+
+	respBytes, err := json.Marshal(resultData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, fmt.Errorf("failed to marshal response: %w", err)
 	}
 
 	var tweet Tweet
@@ -97,116 +113,4 @@ func (s *TweetsService) Create(text string, opts *CreateTweetOptions) (*Tweet, e
 	}
 
 	return &tweet, nil
-}
-
-// Schedule schedules a tweet for future posting.
-// scheduledAt should be an ISO 8601 timestamp (e.g., "2025-12-25T10:30:00Z")
-func (s *TweetsService) Schedule(text string, scheduledAt string) (*ScheduledTweet, error) {
-	if text == "" {
-		return nil, fmt.Errorf("tweet text cannot be empty")
-	}
-	if scheduledAt == "" {
-		return nil, fmt.Errorf("scheduledAt cannot be empty")
-	}
-
-	variables := map[string]interface{}{
-		"tweet_text":   text,
-		"scheduled_at": scheduledAt,
-	}
-
-	query := `mutation CreateScheduledTweet($tweet_text: String!, $scheduled_at: String!) {
-		create_scheduled_tweet(input: {
-			tweet_text: $tweet_text
-			scheduled_at: $scheduled_at
-		}) {
-			data {
-				scheduled_tweet_response {
-					scheduled_tweet {
-						id
-						text
-						scheduled_at
-					}
-				}
-			}
-		}
-	}`
-
-	result, err := s.client.executeGraphQL(query, variables)
-	if err != nil {
-		return nil, err
-	}
-
-	data, ok := result["data"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid response structure")
-	}
-
-	respBytes, err := json.Marshal(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	var scheduled ScheduledTweet
-	if err := json.Unmarshal(respBytes, &scheduled); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal scheduled tweet: %w", err)
-	}
-
-	return &scheduled, nil
-}
-
-// GetScheduled fetches all scheduled tweets.
-func (s *TweetsService) GetScheduled() ([]*ScheduledTweet, error) {
-	query := `query FetchScheduledTweets {
-		scheduled_tweets {
-			scheduled_tweets {
-				id
-				text
-				scheduled_at
-			}
-		}
-	}`
-
-	result, err := s.client.executeGraphQL(query, make(map[string]interface{}))
-	if err != nil {
-		return nil, err
-	}
-
-	data, ok := result["data"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid response structure")
-	}
-
-	respBytes, err := json.Marshal(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	var tweets []*ScheduledTweet
-	if err := json.Unmarshal(respBytes, &tweets); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal scheduled tweets: %w", err)
-	}
-
-	return tweets, nil
-}
-
-// DeleteScheduled deletes a scheduled tweet.
-func (s *TweetsService) DeleteScheduled(scheduledTweetID string) error {
-	variables := map[string]interface{}{
-		"id": scheduledTweetID,
-	}
-
-	query := `mutation DeleteScheduledTweet($id: String!) {
-		delete_scheduled_tweet(input: {
-			id: $id
-		}) {
-			data {
-				delete_scheduled_tweet_response {
-					success
-				}
-			}
-		}
-	}`
-
-	_, err := s.client.executeGraphQL(query, variables)
-	return err
 }
