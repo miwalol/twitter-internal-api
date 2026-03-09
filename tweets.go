@@ -114,3 +114,17 @@ func (s *TweetsService) Create(text string, opts *CreateTweetOptions) (*Tweet, e
 
 	return &tweet, nil
 }
+
+// Delete deletes a tweet by ID.
+func (s *TweetsService) Delete(tweetID string) error {
+	if tweetID == "" {
+		return fmt.Errorf("tweet ID cannot be empty")
+	}
+
+	variables := map[string]interface{}{
+		"tweet_id": tweetID,
+	}
+
+	_, err := s.client.ExecuteGraphQL(variables, "nxpZCY2K-I6QoFHAHeojFQ", "DeleteTweet", nil)
+	return err
+}

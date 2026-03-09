@@ -162,8 +162,6 @@ func (c *Client) ExecuteGraphQL(
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	log.Println(string(respBody))
-
 	var result map[string]interface{}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
