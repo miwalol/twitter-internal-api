@@ -21,7 +21,7 @@ func (s *TweetsService) Create(text string, opts *CreateTweetOptions) (*Tweet, e
 	}
 
 	// Build media entities
-	mediaEntities := []interface{}{}
+	var mediaEntities []interface{}
 	if len(opts.MediaEntities) > 0 {
 		for _, entity := range opts.MediaEntities {
 			mediaEntities = append(mediaEntities, map[string]interface{}{

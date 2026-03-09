@@ -3,6 +3,7 @@ package twitterinternalapi
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -209,12 +210,16 @@ func (c *Client) ExecuteGraphQL(
 	}
 
 	var result map[string]interface{}
-	if err := json.Unmarshal(respBody, &result); err != nil {
+	if err = json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(result["message"].(string)))
+		if message, ok := result["message"].(string); ok {
+			return nil, errors.New(message)
+		}
+
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
 	if errs, ok := result["errors"].([]interface{}); ok && len(errs) > 0 {
