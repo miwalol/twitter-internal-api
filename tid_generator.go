@@ -28,7 +28,7 @@ func NewTransactionIDGenerator(frames [][][]int) *TransactionIDGenerator {
 
 // GenerateHeader generates an X-Client-Transaction-ID header
 func (g *TransactionIDGenerator) GenerateHeader(path, method, key string) string {
-	if g.frames == nil || len(g.frames) == 0 {
+	if len(g.frames) == 0 {
 		return ""
 	}
 

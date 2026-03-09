@@ -23,11 +23,18 @@ type PublicMetrics struct {
 	BookmarkCount int `json:"bookmark_count"`
 }
 
+// MediaEntity represents a media attachment in a tweet
+type MediaEntity struct {
+	MediaID     string        `json:"media_id"`
+	TaggedUsers []interface{} `json:"tagged_users"`
+}
+
 // CreateTweetOptions contains options for creating a tweet.
 type CreateTweetOptions struct {
-	MediaIDs  []string `json:"media_ids,omitempty"`
-	ReplyTo   *string  `json:"reply_to,omitempty"`
-	Sensitive bool     `json:"sensitive,omitempty"`
+	MediaIDs      []string      `json:"media_ids,omitempty"`
+	MediaEntities []MediaEntity `json:"media_entities,omitempty"`
+	ReplyTo       *string       `json:"reply_to,omitempty"`
+	Sensitive     bool          `json:"sensitive,omitempty"`
 }
 
 // ScheduledTweet represents a scheduled tweet.

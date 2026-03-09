@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-	client := twitterinternalapi.NewClient("your-auth-token")
+	client := twitterinternalapi.NewClient("your-auth-token", "your-csrf-token")
 	
 	tweet, err := client.Tweets.Create("Hello from Go!", nil)
 	if err != nil {
@@ -32,7 +32,100 @@ func main() {
 	}
 	
 	log.Println("Tweet ID:", tweet.ID)
+	log.Println("Tweet Text:", tweet.Legacy.FullText)
 }
+```
+
+## Usage Examples
+
+### Authentication
+
+```go
+import "github.com/miwalol/twitter-internal-api"
+
+// Create a client with auth token and CSRF token
+client := twitterinternalapi.NewClient(
+	"your-bearer-token-here",
+	"your-csrf-token-here",
+)
+
+// Set cookies if needed
+client.SetCookies("auth_token=xxx; ct0=yyy")
+
+// Set additional CSRF token
+client.SetCSRFToken("your-csrf-token")
+```
+
+### Creating Tweets
+
+```go
+// Simple tweet
+tweet, err := client.Tweets.Create("Hello Twitter!", nil)
+if err != nil {
+	log.Fatal(err)
+}
+log.Println("Posted:", tweet.ID, tweet.Legacy.FullText)
+
+// Tweet with sensitivity flag
+opts := &twitterinternalapi.CreateTweetOptions{
+	Sensitive: true,
+}
+tweet, err := client.Tweets.Create("Sensitive content", opts)
+```
+
+### Uploading Media
+
+```go
+// Upload an image
+mediaID, err := client.UploadMedia("path/to/image.png", "image/png")
+if err != nil {
+	log.Fatal(err)
+}
+log.Println("Media uploaded:", mediaID)
+
+// Create tweet with uploaded media
+opts := &twitterinternalapi.CreateTweetOptions{
+	MediaEntities: []twitterinternalapi.MediaEntity{
+		{MediaID: mediaID, TaggedUsers: []interface{}{}},
+	},
+}
+tweet, err := client.Tweets.Create("Posted with image!", opts)
+```
+
+### Deleting Tweets
+
+```go
+// Delete a tweet by ID
+err := client.Tweets.Delete("2031054061076685198")
+if err != nil {
+	log.Fatal(err)
+}
+log.Println("Tweet deleted")
+```
+
+### GraphQL Requests
+
+For advanced use cases, you can make custom GraphQL queries:
+
+```go
+variables := map[string]interface{}{
+	"tweet_text": "Custom query",
+}
+
+features := map[string]bool{
+	"responsive_web_edit_tweet_api_enabled": true,
+}
+
+result, err := client.ExecuteGraphQL(
+	variables,
+	"sb6vH7FMb090KdK6IZaakw", // queryId
+	"CreateTweet",              // operationName
+	features,
+)
+if err != nil {
+	log.Fatal(err)
+}
+log.Println(result)
 ```
 
 ## License
