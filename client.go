@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,6 +21,7 @@ const (
 type Client struct {
 	authToken  string
 	csrfToken  string
+	mu         sync.RWMutex
 	httpClient *http.Client
 	cookies    string
 	tidKey     string
@@ -46,6 +47,8 @@ func NewClient(authToken, csrfToken string) *Client {
 
 // SetCSRFToken sets the CSRF token for requests
 func (c *Client) SetCSRFToken(token string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.csrfToken = token
 }
 
@@ -63,6 +66,41 @@ func (c *Client) SetTransactionIDGenerator(key string, frames [][][]int) {
 // SetHTTPClient allows you to provide a custom HTTP client.
 func (c *Client) SetHTTPClient(httpClient *http.Client) {
 	c.httpClient = httpClient
+}
+
+// GetCSRFToken returns the current CSRF token (ct0 cookie value)
+func (c *Client) GetCSRFToken() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.csrfToken
+}
+
+// setCSRFTokenLocked sets the CSRF token in a thread-safe manner (internal use)
+func (c *Client) setCSRFTokenLocked(token string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.csrfToken = token
+}
+
+// extractCT0FromCookie extracts the ct0 value from a Set-Cookie header
+func extractCT0FromCookie(cookieHeader string) string {
+	parts := strings.Split(cookieHeader, ";")
+	if len(parts) == 0 {
+		return ""
+	}
+
+	mainPart := strings.TrimSpace(parts[0])
+	keyValue := strings.SplitN(mainPart, "=", 2)
+	if len(keyValue) != 2 {
+		return ""
+	}
+
+	cookieName := strings.TrimSpace(keyValue[0])
+	if cookieName == "ct0" {
+		return strings.TrimSpace(keyValue[1])
+	}
+
+	return ""
 }
 
 // GraphQLRequest represents a GraphQL request with variables and features
@@ -123,11 +161,12 @@ func (c *Client) ExecuteGraphQL(
 		}
 	}
 
-	if c.csrfToken != "" {
-		req.Header.Set("X-CSRF-Token", c.csrfToken)
+	csrfToken := c.GetCSRFToken()
+	if csrfToken != "" {
+		req.Header.Set("X-CSRF-Token", csrfToken)
 		req.AddCookie(&http.Cookie{
 			Name:  "ct0",
-			Value: c.csrfToken,
+			Value: csrfToken,
 		})
 	}
 
@@ -140,7 +179,6 @@ func (c *Client) ExecuteGraphQL(
 
 	if c.cookies != "" {
 		for _, cookie := range strings.Split(c.cookies, ";") {
-			log.Printf("Adding cookie: %s\n", cookie)
 			parts := strings.SplitN(cookie, "=", 2)
 			if len(parts) == 2 {
 				req.AddCookie(&http.Cookie{
@@ -156,6 +194,14 @@ func (c *Client) ExecuteGraphQL(
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	// Handle ct0 cookie updates from response headers
+	for _, setCookie := range resp.Header["Set-Cookie"] {
+		if ct0 := extractCT0FromCookie(setCookie); ct0 != "" {
+			c.setCSRFTokenLocked(ct0)
+			break
+		}
+	}
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
