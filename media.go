@@ -79,20 +79,7 @@ func (c *Client) uploadInit(totalBytes int64, mediaType string) (int64, error) {
 		return 0, err
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.authToken))
-	if c.csrfToken != "" {
-		req.Header.Set("X-CSRF-Token", c.csrfToken)
-		req.AddCookie(&http.Cookie{
-			Name:  "ct0",
-			Value: c.csrfToken,
-		})
-	}
-	if c.authToken != "" {
-		req.AddCookie(&http.Cookie{
-			Name:  "auth_token",
-			Value: c.authToken,
-		})
-	}
+	c.prepareRequest(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -141,20 +128,7 @@ func (c *Client) uploadAppend(mediaID int64, fileData []byte) error {
 	}
 
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.authToken))
-	if c.csrfToken != "" {
-		req.Header.Set("X-CSRF-Token", c.csrfToken)
-		req.AddCookie(&http.Cookie{
-			Name:  "ct0",
-			Value: c.csrfToken,
-		})
-	}
-	if c.authToken != "" {
-		req.AddCookie(&http.Cookie{
-			Name:  "auth_token",
-			Value: c.authToken,
-		})
-	}
+	c.prepareRequest(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -184,20 +158,7 @@ func (c *Client) uploadFinalize(mediaID int64, md5Hash string) error {
 		return err
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.authToken))
-	if c.csrfToken != "" {
-		req.Header.Set("X-CSRF-Token", c.csrfToken)
-		req.AddCookie(&http.Cookie{
-			Name:  "ct0",
-			Value: c.csrfToken,
-		})
-	}
-	if c.authToken != "" {
-		req.AddCookie(&http.Cookie{
-			Name:  "auth_token",
-			Value: c.authToken,
-		})
-	}
+	c.prepareRequest(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

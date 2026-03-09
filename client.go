@@ -16,6 +16,7 @@ const (
 	graphqlBaseURL   = "https://x.com/i/api/graphql"
 	graphqlReferrer  = "https://x.com/"
 	graphqlFetchSite = "same-origin"
+	bearerToken      = "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
 )
 
 // Client represents a Twitter API client authenticated with a token.
@@ -117,6 +118,19 @@ func extractCT0FromCookie(cookieHeader string) string {
 	return ""
 }
 
+// prepareRequest attaches the static bearer token, CSRF token, and auth cookies to req.
+func (c *Client) prepareRequest(req *http.Request) {
+	req.Header.Set("Authorization", bearerToken)
+	csrfToken := c.GetCSRFToken()
+	if csrfToken != "" {
+		req.Header.Set("X-CSRF-Token", csrfToken)
+		req.AddCookie(&http.Cookie{Name: "ct0", Value: csrfToken})
+	}
+	if c.authToken != "" {
+		req.AddCookie(&http.Cookie{Name: "auth_token", Value: c.authToken})
+	}
+}
+
 // GraphQLRequest represents a GraphQL request with variables and features
 type GraphQLRequest struct {
 	Variables map[string]interface{} `json:"variables"`
@@ -140,7 +154,7 @@ func (c *Client) doGraphQLRequest(body []byte, queryID, operationName string, re
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA")
+	c.prepareRequest(req)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "*/*")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
@@ -160,16 +174,6 @@ func (c *Client) doGraphQLRequest(body []byte, queryID, operationName string, re
 		if transactionID != "" {
 			req.Header.Set("X-Client-Transaction-ID", transactionID)
 		}
-	}
-
-	csrfToken := c.GetCSRFToken()
-	if csrfToken != "" {
-		req.Header.Set("X-CSRF-Token", csrfToken)
-		req.AddCookie(&http.Cookie{Name: "ct0", Value: csrfToken})
-	}
-
-	if c.authToken != "" {
-		req.AddCookie(&http.Cookie{Name: "auth_token", Value: c.authToken})
 	}
 
 	if c.cookies != "" {
