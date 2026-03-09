@@ -131,6 +131,46 @@ func (c *Client) prepareRequest(req *http.Request) {
 	}
 }
 
+// applyCommonHeaders sets browser-like headers and extra cookies shared across all requests.
+func (c *Client) applyCommonHeaders(req *http.Request) {
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("X-Twitter-Auth-Type", "OAuth2Session")
+	req.Header.Set("Sec-Fetch-Dest", "empty")
+	req.Header.Set("Sec-Fetch-Mode", "cors")
+	req.Header.Set("Sec-Fetch-Site", graphqlFetchSite)
+	req.Header.Set("Sec-CH-UA", `"Not(A:Brand";v="8", "Chromium";v="144"`)
+	req.Header.Set("Sec-CH-UA-Mobile", "?0")
+	req.Header.Set("Sec-CH-UA-Platform", `"macOS"`)
+	req.Header.Set("Referer", graphqlReferrer)
+
+	if c.cookies != "" {
+		for _, cookie := range strings.Split(c.cookies, ";") {
+			parts := strings.SplitN(cookie, "=", 2)
+			if len(parts) == 2 {
+				req.AddCookie(&http.Cookie{
+					Name:  strings.TrimSpace(parts[0]),
+					Value: strings.TrimSpace(parts[1]),
+				})
+			}
+		}
+	}
+}
+
+// applyClientHeaders sets headers that are only applicable to GraphQL/client requests.
+func (c *Client) applyClientHeaders(req *http.Request) {
+	req.Header.Set("X-Twitter-Active-User", "yes")
+	req.Header.Set("X-Twitter-Client-Language", "en")
+
+	if c.tidGen != nil && c.tidKey != "" {
+		transactionID := c.tidGen.GenerateHeader(req.URL.String(), req.Method, c.tidKey)
+		if transactionID != "" {
+			req.Header.Set("X-Client-Transaction-ID", transactionID)
+		}
+	}
+}
+
 // GraphQLRequest represents a GraphQL request with variables and features
 type GraphQLRequest struct {
 	Variables map[string]interface{} `json:"variables"`
@@ -155,38 +195,8 @@ func (c *Client) doGraphQLRequest(body []byte, queryID, operationName string, re
 
 	req.Header.Set("Content-Type", "application/json")
 	c.prepareRequest(req)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
-	req.Header.Set("Accept", "*/*")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	req.Header.Set("X-Twitter-Active-User", "yes")
-	req.Header.Set("X-Twitter-Auth-Type", "OAuth2Session")
-	req.Header.Set("X-Twitter-Client-Language", "en")
-	req.Header.Set("Sec-Fetch-Dest", "empty")
-	req.Header.Set("Sec-Fetch-Mode", "cors")
-	req.Header.Set("Sec-Fetch-Site", graphqlFetchSite)
-	req.Header.Set("Sec-CH-UA", `"Not(A:Brand";v="8", "Chromium";v="144"`)
-	req.Header.Set("Sec-CH-UA-Mobile", "?0")
-	req.Header.Set("Sec-CH-UA-Platform", `"macOS"`)
-	req.Header.Set("Referer", graphqlReferrer)
-
-	if c.tidGen != nil && c.tidKey != "" {
-		transactionID := c.tidGen.GenerateHeader(finalURL, "POST", c.tidKey)
-		if transactionID != "" {
-			req.Header.Set("X-Client-Transaction-ID", transactionID)
-		}
-	}
-
-	if c.cookies != "" {
-		for _, cookie := range strings.Split(c.cookies, ";") {
-			parts := strings.SplitN(cookie, "=", 2)
-			if len(parts) == 2 {
-				req.AddCookie(&http.Cookie{
-					Name:  strings.TrimSpace(parts[0]),
-					Value: strings.TrimSpace(parts[1]),
-				})
-			}
-		}
-	}
+	c.applyCommonHeaders(req)
+	c.applyClientHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

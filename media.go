@@ -80,6 +80,7 @@ func (c *Client) uploadInit(totalBytes int64, mediaType string) (int64, error) {
 	}
 
 	c.prepareRequest(req)
+	c.applyCommonHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -129,6 +130,7 @@ func (c *Client) uploadAppend(mediaID int64, fileData []byte) error {
 
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	c.prepareRequest(req)
+	c.applyCommonHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -159,6 +161,7 @@ func (c *Client) uploadFinalize(mediaID int64, md5Hash string) error {
 	}
 
 	c.prepareRequest(req)
+	c.applyCommonHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
