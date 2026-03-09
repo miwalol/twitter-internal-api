@@ -20,14 +20,15 @@ const (
 
 // Client represents a Twitter API client authenticated with a token.
 type Client struct {
-	authToken  string
-	csrfToken  string
-	mu         sync.RWMutex
-	httpClient *http.Client
-	cookies    string
-	tidKey     string
-	tidGen     *TransactionIDGenerator
-	Tweets     *TweetsService
+	authToken       string
+	csrfToken       string
+	mu              sync.RWMutex
+	httpClient      *http.Client
+	cookies         string
+	tidKey          string
+	tidGen          *TransactionIDGenerator
+	Tweets          *TweetsService
+	onCSRFRefreshed func(newToken string)
 }
 
 // NewClient creates a new Twitter API client with the given auth token.
@@ -76,11 +77,23 @@ func (c *Client) GetCSRFToken() string {
 	return c.csrfToken
 }
 
+// OnCSRFRefreshed registers a callback invoked whenever the ct0 token is refreshed from a response.
+// Useful for persisting the updated token to a cache or storage.
+func (c *Client) OnCSRFRefreshed(fn func(newToken string)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.onCSRFRefreshed = fn
+}
+
 // setCSRFTokenLocked sets the CSRF token in a thread-safe manner (internal use)
 func (c *Client) setCSRFTokenLocked(token string) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.csrfToken = token
+	fn := c.onCSRFRefreshed
+	c.mu.Unlock()
+	if fn != nil {
+		fn(token)
+	}
 }
 
 // extractCT0FromCookie extracts the ct0 value from a Set-Cookie header

@@ -54,6 +54,11 @@ client.SetCookies("auth_token=xxx; ct0=yyy")
 
 // Set additional CSRF token
 client.SetCSRFToken("your-csrf-token")
+
+// Register a callback for when ct0 is refreshed (e.g. to persist it)
+client.OnCSRFRefreshed(func(newToken string) {
+	// save newToken to cache, database, etc.
+})
 ```
 
 ### Creating Tweets
